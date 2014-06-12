@@ -1,20 +1,88 @@
 # Reproducible Research: Peer Assessment 1
 
-
 ## Loading and preprocessing the data
 
-
+Read CSV data suppressing timezone warnings.
+```{r}
+suppressWarnings(activity <- read.csv("activity.csv", colClasses=c("integer", "Date", "integer")))
+```
 
 ## What is mean total number of steps taken per day?
 
+Group daily records summing taken steps.
+```{r}
+stepsByDay <- aggregate(steps ~ date, data=activity, sum)
+```
+
+Histogram of steps taken by day.
+```{r}
+library(ggplot2)
+qplot(stepsByDay$steps, binwidth = 5000)
+```
+
+Calculate mean and median:
+```{r}
+mean(stepsByDay$steps, na.rm = TRUE)
+median(stepsByDay$steps, na.rm = TRUE)
+```
 
 
 ## What is the average daily activity pattern?
 
+Group records by interval averaging steps.
+```{r}
+stepsByInterval <- aggregate(steps ~ interval, data=activity, mean)
+```
 
+Plot of average steps taken during interval.
+```{r}
+qplot(interval, steps, data = stepsByInterval, geom="line")
+```
+
+Calculate interval having maximum number of steps (on average) taken.
+```{r}
+stepsByInterval$interval[which.max(stepsByInterval$steps)]
+```
 
 ## Imputing missing values
 
+Total number of missing values.
+```{r}
+sum(is.na(activity$steps))
+```
 
+Replace missing values by average steps taken in this interval.
+```{r}
+cleanActivity <- data.frame(activity)
+for (i in which(is.na(cleanActivity$steps))) {
+    cleanActivity$steps[i] = stepsByInterval[stepsByInterval$interval == cleanActivity$interval[i], ]$steps
+}
+```
+
+Recalculate daily steps, mean and median,and plot it again.
+```{r}
+stepsByDay <- aggregate(steps ~ date, data=cleanActivity, sum)
+qplot(stepsByDay$steps, binwidth = 5000)
+mean(stepsByDay$steps, na.rm = TRUE)
+median(stepsByDay$steps, na.rm = TRUE)
+```
+
+The largest bar on the plot became even larger. It can be explained by the fact that it consists of steps counts around the mean and our imputing procedure replaced missed values by averages.
 
 ## Are there differences in activity patterns between weekdays and weekends?
+Create a new factor variable with two levels – “weekday” and “weekend” and group records by weekpart and interval averaging steps count.
+```{r}
+Sys.setlocale("LC_TIME", "C")
+days <- weekdays(cleanActivity$date)
+str(days)
+cleanActivity$weekpart <- as.factor(ifelse(days == "Saturday" | days == "Sunday", "weekend", "weekday"))
+stepsByWeekPart <- aggregate(steps ~ weekpart + interval, data=cleanActivity, mean)
+str(stepsByWeekPart)
+```
+
+Plot average steps taken by time interval on two panels - for weekdays and weekends.
+```{r cache=FALSE, fig.keep="all"}
+qplot(interval, steps, data=stepsByWeekPart, facets= weekpart ~ ., geom="line" )
+```
+
+Activity on weekends tends to be more uniformly distributed throughout the dayincomparison with the weekday activity.
